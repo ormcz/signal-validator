@@ -10,7 +10,8 @@ const map = L.map('map', {
 const layers = {}
 
 layers["OSM"] = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
+    maxZoom: 21,        // allow user to zoom further
+    maxNativeZoom: 19,  // OSM only provides tiles up to 19
     attribution: '© OpenStreetMap'
 })
 
@@ -506,68 +507,69 @@ function render(data) {
                 });
             }
 
-            // // HIGH ZOOM → azimuth-based rendering
-            // const azimuth = f.pos.azm ?? 0;
-            //
-            // // Convert azimuth (degrees) to radians
-            // const angle =  (90 - azimuth) * Math.PI / 180;
-            //
-            // // Small offset for direction line
-            // const length = 0.0003; // tweak depending on zoom feel
-            //
-            // const latOffset = Math.sin(angle) * length;
-            // const lngOffset = Math.cos(angle) * length;
-            //
-            // const target = L.latLng(
-            //     latlng.lat + latOffset,
-            //     latlng.lng + lngOffset
-            // );
 
+            const r = hasErrors ? 5 : 4;
+            const size = r * 4; // Increased container size to ensure the "tail" doesn't clip
+            const fillColor = hasErrors ? "#ff4d4d" : "#2ecc71";
 
-            let objects = [
-                L.circleMarker(latlng, {
-                    radius: hasErrors ? 6 : 4,
-                    fillColor: hasErrors ? "#ff4d4d" : "#2ecc71",
-                    color: "#000",
-                    weight: 1,
-                    fillOpacity: 0.9
-                }),
-            ];
+            let finalAzimuth = f.pos.azm;
+            let isDirectional = false;
 
-            let azimuth = f.pos.azm;
-
-            if (azimuth !== null && ["forward", "backward"].includes(f.tags["railway:signal:direction"])) {
-
-                if (f.tags["railway:signal:direction"] === "backward")
-                    azimuth += 180;
-
-                const angle = (azimuth + 90) * Math.PI / 180;
-
-                // Project to pixel coordinates at current zoom
-                const p = map.project(latlng, zoom);
-
-                // Length in pixels (NOT degrees!)
-                const length = 20;
-
-                // Screen-space offset
-                const dx = Math.cos(angle) * length;
-                const dy = Math.sin(angle) * length;
-
-                // Convert back to lat/lng
-                const target = map.unproject(
-                    L.point(p.x + dx, p.y + dy),
-                    zoom
-                );
-
-                objects.push(
-                    L.polyline([latlng, target], {
-                        color: hasErrors ? "#ff4d4d" : "#2ecc71",
-                        weight: 2
-                    })
-                )
+            if (finalAzimuth !== null && ["forward", "backward"].includes(f.tags["railway:signal:direction"])) {
+                isDirectional = true;
+                if (f.tags["railway:signal:direction"] === "backward") {
+                    finalAzimuth += 180;
+                }
             }
 
-            return L.layerGroup(objects);
+            let svgContent;
+
+            if (isDirectional) {
+
+                /**
+                 * SVG Path Breakdown (viewBox 24x24):
+                 * Center point is (12, 12).
+                 * 1. Move to (2, 12) - Left side of the flat edge.
+                 * 2. Arc to (22, 12) - The semi-circle (Radius 10).
+                 * 3. Line to (22, 17) - Down to form one side of the rectangle (r/2 = 5 units).
+                 * 4. Line to (2, 17)  - The bottom flat edge of the rectangle.
+                 * 5. Close path back to (2, 12).
+                 */
+                svgContent = `
+                    <svg width="${size}" height="${size}" viewBox="0 0 24 24" style="transform: rotate(${finalAzimuth}deg); transform-origin: center; display: block;">
+                        <path 
+                            d="M 2 12 
+                               A 10 10 0 0 1 22 12 
+                               L 22 17 
+                               L 2 17 
+                               Z" 
+                            fill="${fillColor}" 
+                            fill-opacity="0.9" 
+                            stroke="#000" 
+                            stroke-width="2" 
+                            stroke-linejoin="round"
+                        />
+                    </svg>
+                `;
+            } else {
+                // Standard full circle
+                svgContent = `
+                    <svg width="${size}" height="${size}" viewBox="0 0 24 24" style="display: block;">
+                        <circle cx="12" cy="12" r="10" fill="${fillColor}" fill-opacity="0.9" stroke="#000" stroke-width="2" />
+                    </svg>
+                `;
+            }
+
+            const marker = L.marker(latlng, {
+                icon: L.divIcon({
+                    html: svgContent,
+                    className: '',
+                    iconSize: [size, size],
+                    iconAnchor: [size / 2, size / 2]
+                })
+            });
+
+            return L.layerGroup([marker]);
         },
 
         onEachFeature: (f, l) => {
