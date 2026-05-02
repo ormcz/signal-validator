@@ -457,45 +457,148 @@ function render(data) {
     if (layer) map.removeLayer(layer);
     if (!data) return;
 
+    const bounds = map.getBounds();
+
     const activeFilters = new Set(
         Array.from(document.querySelectorAll('.filter-check:checked'))
-        .map(cb => cb.value)
+            .map(cb => cb.value)
     );
 
-    layer = L.geoJSON(data, {
-        filter: (f) => {
-            const errors = validate(f.properties.tags);
+    // 🔥 Filter BEFORE creating GeoJSON
+    const visibleFeatures = data.filter(item => {
+        const latlng = L.latLng(item.pos.lat, item.pos.lon);
 
-            if (errors.length === 0) return activeFilters.has("valid");
+        // Only keep points inside current map view
+        if (!bounds.contains(latlng)) return false;
 
-            return errors.some(err => activeFilters.has(err));
-        },
+        // Apply error filters
+        if (item.errors.length === 0)
+            return activeFilters.has("valid");
 
+        return item.errors.some(err => activeFilters.has(err));
+    });
+
+    const geoData = {
+        type: "FeatureCollection",
+        features: visibleFeatures.map(item => ({
+            type: "Feature",
+            geometry: {
+                type: "Point",
+                coordinates: [item.pos.lon, item.pos.lat]
+            },
+            ...item
+        }))
+    };
+
+    layer = L.geoJSON(geoData, {
         pointToLayer: (f, latlng) => {
-            const errors = validate(f.properties.tags);
-            const hasErrors = errors.length > 0;
+            const hasErrors = f.errors.length > 0;
+            const zoom = map.getZoom();
 
-            return L.circleMarker(latlng, {
-                radius: hasErrors ? 7 : 4,
-                fillColor: hasErrors ? "#ff4d4d" : "#2ecc71",
-                color: "#000",
-                weight: 1,
-                fillOpacity: 0.9
-            });
+            // LOW ZOOM → simple dots
+            if (zoom < 16) {
+                return L.circleMarker(latlng, {
+                    radius: hasErrors ? 7 : 4,
+                    fillColor: hasErrors ? "#ff4d4d" : "#2ecc71",
+                    color: "#000",
+                    weight: 1,
+                    fillOpacity: 0.9
+                });
+            }
+
+            // // HIGH ZOOM → azimuth-based rendering
+            // const azimuth = f.pos.azm ?? 0;
+            //
+            // // Convert azimuth (degrees) to radians
+            // const angle =  (90 - azimuth) * Math.PI / 180;
+            //
+            // // Small offset for direction line
+            // const length = 0.0003; // tweak depending on zoom feel
+            //
+            // const latOffset = Math.sin(angle) * length;
+            // const lngOffset = Math.cos(angle) * length;
+            //
+            // const target = L.latLng(
+            //     latlng.lat + latOffset,
+            //     latlng.lng + lngOffset
+            // );
+
+
+            let objects = [
+                L.circleMarker(latlng, {
+                    radius: hasErrors ? 6 : 4,
+                    fillColor: hasErrors ? "#ff4d4d" : "#2ecc71",
+                    color: "#000",
+                    weight: 1,
+                    fillOpacity: 0.9
+                }),
+            ];
+
+            let azimuth = f.pos.azm;
+
+            if (azimuth !== null && ["forward", "backward"].includes(f.tags["railway:signal:direction"])) {
+
+                if (f.tags["railway:signal:direction"] === "backward")
+                    azimuth += 180;
+
+                const angle = (azimuth + 90) * Math.PI / 180;
+
+                // Project to pixel coordinates at current zoom
+                const p = map.project(latlng, zoom);
+
+                // Length in pixels (NOT degrees!)
+                const length = 20;
+
+                // Screen-space offset
+                const dx = Math.cos(angle) * length;
+                const dy = Math.sin(angle) * length;
+
+                // Convert back to lat/lng
+                const target = map.unproject(
+                    L.point(p.x + dx, p.y + dy),
+                    zoom
+                );
+
+                objects.push(
+                    L.polyline([latlng, target], {
+                        color: hasErrors ? "#ff4d4d" : "#2ecc71",
+                        weight: 2
+                    })
+                )
+            }
+
+            return L.layerGroup(objects);
         },
 
         onEachFeature: (f, l) => {
-            const errors = validate(f.properties.tags);
 
-            const errorText = errors.length
-            ? errors.map(e => ERRORS[e] ?? e).join(", ")
-            : "none";
+            const popupHtml = `
+                    <b>ID:</b> ${f.osm.id} 
+                    <a href="https://osm.org/node/${f.osm.id}" target="_blank">View</a> 
+                    <a href="https://osm.org/edit?node=${f.osm.id}" target="_blank">Edit</a>
+                <br>
+                    <b>Errors:</b> ${f.errors.length ? f.errors.map(e => ERRORS[e] ?? e).join(", ") : "none"}
+                <br>
+                    <b>Asimuth:</b> ${f.pos.azm}
+                <hr>
+                    <div class="popup-tags">${formatTags(f.tags)}</div>
+            `;
 
-            l.bindPopup(`
-            <b>ID:</b> ${f.properties.id} <a href="https://osm.org/node/${f.properties.id}" target="_blank">View</a> <a href="https://osm.org/edit?node=${f.properties.id}" target="_blank">Edit</a><br>
-            <b>Errors:</b> ${errorText}<hr>
-            <div class="popup-tags">${formatTags(f.properties.tags)}</div>
-            `);
+            // Case 1: single layer (CircleMarker etc.)
+            if (l instanceof L.Layer && !(l instanceof L.LayerGroup)) {
+                l.bindPopup(popupHtml);
+                return;
+            }
+
+            // Case 2: group (your azimuth + marker combo)
+            if (l instanceof L.LayerGroup) {
+                l.eachLayer(subLayer => {
+                    if (subLayer instanceof L.CircleMarker || subLayer instanceof L.Marker) {
+                        subLayer.bindPopup(popupHtml);
+                    }
+                });
+            }
+
         }
     }).addTo(map);
 }
@@ -572,7 +675,13 @@ function formatTags(tags) {
 async function loadData() {
     try {
         const res = await fetch('api/data');
-        currentData = await res.json();
+        const raw = await res.json();
+
+        currentData = raw.data.map(item => ({
+            ...item,
+            errors: validate(item.tags)
+        }));
+
         render(currentData);
     } catch (e) {
         console.error("Data load failed:", e);
@@ -592,5 +701,13 @@ async function loadData() {
     showLoading(true);
     await loadData();
     showLoading(false);
+
+    map.on('moveend', () => {
+        render(currentData);
+    });
+    map.on('zoomend', () => {
+        render(currentData);
+    });
+
 })();
 

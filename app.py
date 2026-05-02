@@ -3,7 +3,7 @@
 from flask import Flask, send_from_directory, jsonify
 import json
 import os
-from downloader import run_download, DATA_PATH
+from downloader import run, DATA_PATH
 
 app = Flask(__name__, static_folder="static")
 
@@ -22,7 +22,7 @@ def data():
 
 @app.route("/api/redownload", methods=["POST"])
 def redownload():
-    count = run_download()
+    count = run()
     return jsonify({
         "status": "ok",
         "downloaded": count
