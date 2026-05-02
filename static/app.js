@@ -584,8 +584,13 @@ async function loadData() {
  * 9. EXECUTION
  * --------------------------------------------------------------------------
  */
+;(async () => {
+    initButtons();
+    initToggle();
+    initCategories();
 
-initButtons();
-initToggle();
-initCategories();
-loadData();
+    showLoading(true);
+    await loadData();
+    showLoading(false);
+})();
+
