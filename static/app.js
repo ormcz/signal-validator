@@ -76,7 +76,7 @@ function initButtons() {
         setUIEnabled(false);
         showLoading(true);
         try {
-            await fetch('/api/redownload', { method: "POST" });
+            await fetch('api/redownload', { method: "POST" });
             await loadData();
         } catch (e) {
             console.error("Download failed:", e);
@@ -571,7 +571,7 @@ function formatTags(tags) {
 
 async function loadData() {
     try {
-        const res = await fetch('/api/data');
+        const res = await fetch('api/data');
         currentData = await res.json();
         render(currentData);
     } catch (e) {
