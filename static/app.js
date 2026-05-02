@@ -465,12 +465,15 @@ function render(data) {
             .map(cb => cb.value)
     );
 
+    const zoom = map.getZoom();
+    const useBounds = zoom >= 12;
+
     // 🔥 Filter BEFORE creating GeoJSON
     const visibleFeatures = data.filter(item => {
         const latlng = L.latLng(item.pos.lat, item.pos.lon);
 
         // Only keep points inside current map view
-        if (!bounds.contains(latlng)) return false;
+        if (useBounds && !bounds.contains(latlng)) return false;
 
         // Apply error filters
         if (item.errors.length === 0)
@@ -494,7 +497,6 @@ function render(data) {
     layer = L.geoJSON(geoData, {
         pointToLayer: (f, latlng) => {
             const hasErrors = f.errors.length > 0;
-            const zoom = map.getZoom();
 
             // LOW ZOOM → simple dots
             if (zoom < 16) {
@@ -668,6 +670,37 @@ function formatTags(tags) {
     return lines.join("<br>");
 }
 
+function initRendering() {
+    const ZOOM_THRESHOLD = 12;
+
+    let lastZoom = map.getZoom();
+
+    function shouldRerenderOnZoomChange(oldZoom, newZoom) {
+        return oldZoom >= ZOOM_THRESHOLD || newZoom >= ZOOM_THRESHOLD;
+    }
+
+    function shouldRenderOnMove() {
+        return map.getZoom() >= ZOOM_THRESHOLD;
+    }
+
+    map.on('zoomend', () => {
+        const newZoom = map.getZoom();
+
+        if (shouldRerenderOnZoomChange(lastZoom, newZoom)) {
+            render(currentData);
+        }
+
+        lastZoom = newZoom;
+    });
+
+    map.on('moveend', () => {
+        if (shouldRenderOnMove()) {
+            render(currentData);
+        }
+    });
+}
+
+
 /**
  * --------------------------------------------------------------------------
  * 8. DATA LOADING
@@ -699,17 +732,11 @@ async function loadData() {
     initButtons();
     initToggle();
     initCategories();
+    initRendering();
 
     showLoading(true);
     await loadData();
     showLoading(false);
-
-    map.on('moveend', () => {
-        render(currentData);
-    });
-    map.on('zoomend', () => {
-        render(currentData);
-    });
 
 })();
 
