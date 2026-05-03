@@ -33,9 +33,44 @@ type VisibilityTreeItem = {
     feature: Feature;
 };
 
+type SelectionListener = (feature: Feature | null) => void;
+
+
 
 export class Map {
     private detailZoomThreshold = 16;
+
+
+    private selectedId: number | null = null;
+    private listeners: SelectionListener[] = [];
+
+    onSelect(cb: SelectionListener) {
+        this.listeners.push(cb);
+    }
+
+    private emitSelect(feature: Feature | null) {
+        this.listeners.forEach(cb => cb(feature));
+    }
+
+    private selectFeature(feature: Feature) {
+        const isSame = this.selectedId === feature.properties.id;
+
+        this.selectedId = isSame ? null : feature.properties.id;
+
+        this.render(true);
+
+        this.emitSelect(isSame ? null : feature);
+    }
+
+    private clearSelection() {
+        if (this.selectedId === null) return;
+
+        this.selectedId = null;
+
+        this.render(true); // force re-render (important for SIMPLE mode)
+
+        this.emitSelect(null);
+    }
 
 
     private map: L.Map;
@@ -62,6 +97,7 @@ export class Map {
 
         this.map.on("zoomend", () => this.render());
         this.map.on("moveend", () => this.render());
+        this.map.on("click", () => this.clearSelection());
     }
 
     update(collection: Collection) {
@@ -101,11 +137,11 @@ export class Map {
         return results.map(r => r.feature);
     }
 
-    private render() {
+    private render(force: boolean = false) {
         const zoom = this.map.getZoom();
         const nextMode: Mode = zoom < this.detailZoomThreshold ? MODE.SIMPLE : MODE.DETAILED;
 
-        if (nextMode === this.mode && nextMode === MODE.SIMPLE) {
+        if (!force && nextMode === this.mode && nextMode === MODE.SIMPLE) {
             return;
         }
 
@@ -137,12 +173,21 @@ export class Map {
             // renderer: L.canvas(),
 
             pointToLayer: (f: Feature, latlng) => {
+                const isSelected = f.properties.id === this.selectedId;
+
                 return L.circleMarker(latlng, {
                     radius: 4,
                     fillColor: f.properties.col,
-                    color: "#000",
+                    color: isSelected ? "#fff" : "#000",
                     weight: 1,
                     fillOpacity: 0.9
+                });
+            },
+
+            onEachFeature: (feature, layer) => {
+                layer.on("click", (e) => {
+                    L.DomEvent.stopPropagation(e); // 👈 critical
+                    this.selectFeature(feature as Feature)
                 });
             }
         });
@@ -151,6 +196,8 @@ export class Map {
     private renderDetailed(data: Collection) {
         return L.geoJSON(data, {
             pointToLayer: (f: Feature, latlng) => {
+                const isSelected = f.properties.id === this.selectedId;
+
                 const p = f.properties;
                 const size = 20;
 
@@ -163,7 +210,7 @@ export class Map {
                                 cx="12" cy="12" r="10"
                                 fill="${p.col}"
                                 fill-opacity="0.9"
-                                stroke="#000"
+                                stroke="${isSelected ? "#fff" : "#000"}"
                                 stroke-width="2"
                             />
                         </svg>
@@ -180,7 +227,7 @@ export class Map {
                                Z"
                             fill="${p.col}"
                             fill-opacity="0.9"
-                            stroke="#000"
+                            stroke="${isSelected ? "#fff" : "#000"}"
                             stroke-width="2"
                             stroke-linejoin="round"
                         />
@@ -195,6 +242,13 @@ export class Map {
                         iconSize: [size, size],
                         iconAnchor: [size / 2, size / 2]
                     })
+                });
+            },
+
+            onEachFeature: (feature, layer) => {
+                layer.on("click", (e) => {
+                    L.DomEvent.stopPropagation(e); // 👈 critical
+                    this.selectFeature(feature as Feature)
                 });
             }
         });

@@ -14,6 +14,7 @@ import {Map} from "./map.ts";
 const api = new Api();
 
 const map = new Map("map");
+// map.onSelect(alert);
 
 // const map = L.map('map', {
 //     zoomControl: false
