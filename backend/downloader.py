@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 # --- Configuration ---
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
-DATA_PATH = "../data/signals.json"
+DATA_PATH = os.path.join(os.path.dirname(__file__), "../data/signals.json")
 ANGLE_TOLERANCE = 45.0
 
 QUERY = """
