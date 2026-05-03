@@ -20,7 +20,7 @@ def data():
     with open(DATA_PATH) as f:
         return jsonify(json.load(f))
 
-@app.route("/api/redownload", methods=["POST"])
+@app.route("/api/refresh", methods=["POST"])
 def redownload():
     count = run()
     return jsonify({
