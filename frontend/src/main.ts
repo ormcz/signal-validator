@@ -1,13 +1,25 @@
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+
+import "./style.css";
+import {Api} from "./api.ts";
+
+// export default {};
+
 /**
  * --------------------------------------------------------------------------
  * 1. GLOBAL CONFIGURATION & STATE
  * --------------------------------------------------------------------------
  */
+
+
+const api = new Api();
+
 const map = L.map('map', {
     zoomControl: false
 }).setView([49.8, 15.5], 7);
 
-const layers = {}
+const layers = {} as any;
 
 layers["OSM"] = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 21,        // allow user to zoom further
@@ -17,25 +29,25 @@ layers["OSM"] = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
 
 
 const customLayer = L.TileLayer.extend({
-    getTileUrl: function(coords) {
+    getTileUrl: function(coords: any) {
         const tileSize = this.getTileSize();
         const nwPoint = coords.scaleBy(tileSize);
         const sePoint = nwPoint.add(tileSize);
 
-        const nw = map.options.crs.project(map.unproject(nwPoint, coords.z));
-        const se = map.options.crs.project(map.unproject(sePoint, coords.z));
+        const nw = map.options.crs!.project(map.unproject(nwPoint, coords.z));
+        const se = map.options.crs!.project(map.unproject(sePoint, coords.z));
 
         const bbox = [nw.x, se.y, se.x, nw.y].join(',');
 
         return `http://127.0.0.1:8082/EPSG:3857/256/256/${bbox}`;
     }
 });
-layers["ORTOFOTO"] = new customLayer(null, { maxZoom: 21 })
+layers["ORTOFOTO"] = new (customLayer as any)(null, { maxZoom: 21 });
+let currentLayer: any = null;
 
 
-
-let layer;
-let currentData = null;
+let layer: any;
+let currentData: any = null;
 
 const CATEGORIES = [
     "main", "main_repeated", "distant", "distant_repeated", "minor", "minor_repeated", "minor_distant", "combined", "combined_repeated",
@@ -73,11 +85,11 @@ const ERRORS = {
 
 function initButtons() {
     const downloadBtn = document.getElementById("btn");
-    downloadBtn.onclick = async () => {
+    downloadBtn!.onclick = async () => {
         setUIEnabled(false);
         showLoading(true);
         try {
-            await fetch('api/redownload', { method: "POST" });
+            await api.refresh()
             await loadData();
         } catch (e) {
             console.error("Download failed:", e);
@@ -87,14 +99,14 @@ function initButtons() {
         }
     };
 
-    document.getElementById('zoom-in').onclick = () => map.zoomIn();
-    document.getElementById('zoom-out').onclick = () => map.zoomOut();
+    document.getElementById('zoom-in')!.onclick = () => map.zoomIn();
+    document.getElementById('zoom-out')!.onclick = () => map.zoomOut();
 }
 
 function initToggle() {
-    const container = document.getElementById('layer-switch');
+    const container = document.getElementById('layer-switch')!;
 
-    Object.entries(layers).forEach(([name, layer], index) => {
+    Object.entries(layers).forEach(([name, layer]: [string, any], index) => {
         const btn = document.createElement('div');
         btn.className = 'segment';
         btn.textContent = name;
@@ -126,7 +138,7 @@ function initToggle() {
 }
 
 function initCategories() {
-    const container = document.getElementById("error-list");
+    const container = document.getElementById("error-list")!;
     container.innerHTML = "";
 
     const helperRow = document.createElement("div");
@@ -146,22 +158,22 @@ function initCategories() {
 
     for (const [key, label] of Object.entries(ERRORS)) {
         container.appendChild(
-            createFilterItem(key, label)
+            createFilterItem(key, label, false, false)
         );
     }
 
-    document.getElementById('sel-all').onclick = () => {
-        document.querySelectorAll('.filter-check').forEach(cb => cb.checked = true);
+    document.getElementById('sel-all')!.onclick = () => {
+        document.querySelectorAll('.filter-check').forEach(cb => (cb as any).checked = true);
         render(currentData);
     };
 
-    document.getElementById('sel-none').onclick = () => {
-        document.querySelectorAll('.filter-check').forEach(cb => cb.checked = false);
+    document.getElementById('sel-none')!.onclick = () => {
+        document.querySelectorAll('.filter-check').forEach(cb => (cb as any).checked = false);
         render(currentData);
     };
 
     document.querySelectorAll('.filter-check').forEach(el => {
-        el.onchange = () => render(currentData);
+        (el as any).onchange = () => render(currentData);
     });
 }
 
@@ -171,25 +183,25 @@ function initCategories() {
  * --------------------------------------------------------------------------
  */
 
-function setUIEnabled(enabled) {
+function setUIEnabled(enabled: boolean) {
     const controls = document.querySelectorAll('#btn, .zoom-btn, .filter-check, .action-btn');
     controls.forEach(el => {
         if (enabled) {
             el.classList.remove('disabled');
-            el.style.pointerEvents = 'auto';
+            (el as any).style.pointerEvents = 'auto';
         } else {
             el.classList.add('disabled');
-            el.style.pointerEvents = 'none';
+            (el as any).style.pointerEvents = 'none';
         }
     });
 }
 
-function showLoading(on) {
-    document.getElementById("overlay").classList.toggle("active", on);
+function showLoading(on: boolean) {
+    document.getElementById("overlay")!.classList.toggle("active", on);
     document.body.classList.toggle("disabled", on);
 }
 
-function createFilterItem(value, label, isBold, checked) {
+function createFilterItem(value: any, label: any, isBold: any, checked: any) {
     const item = document.createElement("label");
     item.className = "filter-item";
     if (isBold) item.style.fontWeight = "bold";
@@ -239,11 +251,11 @@ const ALLOWED_COMBINATIONS = {
         "CZ-D1:stanoviste_posledniho_oddiloveho_navestidla", "CZ-D1:hlavni_navestidlo_slouceno_s_predvesti"
     ]),
     resetting_switch: new Set(["CZ-D1:navestidlo_vyhybky_se_samovratnym_prestavnikem"])
-};
+} as any;
 
-VALIDATORS = {}
+const VALIDATORS = {} as any;
 
-VALIDATORS.unknown_signal_type = (tags) => {
+VALIDATORS.unknown_signal_type = (tags: any) => {
 
     for (const category of CATEGORIES) {
         const key = `railway:signal:${category}`;
@@ -265,7 +277,7 @@ VALIDATORS.unknown_signal_type = (tags) => {
     return false;
 }
 
-VALIDATORS.weird_ref = (tags) => {
+VALIDATORS.weird_ref = (tags: any) => {
 
     const ref = tags.ref;
     if (!ref) return false;
@@ -295,17 +307,15 @@ VALIDATORS.weird_ref = (tags) => {
     return false;
 }
 
-VALIDATORS.weird_function = (tags) => {
-
-    const ref = tags.ref;
+VALIDATORS.weird_function = (tags: any) => {
 
     for (let category of [ "main", "main_repeated", "combined", "combined_repeated" ]) {
-        const val = tags[`railway:signal:${category}:function`];
+        const val: string | undefined = tags[`railway:signal:${category}:function`];
         if (!val) continue;
 
         const vals = val.split(";").filter(v => !!v);
 
-        if (vals.some(v => !["entry", "exit", "intermediate", "block", "protection"].includes(v)))
+        if (vals.some((v) => !["entry", "exit", "intermediate", "block", "protection"].includes(v)))
             return true;
     }
 
@@ -314,7 +324,7 @@ VALIDATORS.weird_function = (tags) => {
 
 
 
-VALIDATORS.mismatched_function = (tags) => {
+VALIDATORS.mismatched_function = (tags: any) => {
 
     const ref = tags.ref;
     const fun =
@@ -348,7 +358,7 @@ VALIDATORS.mismatched_function = (tags) => {
 }
 
 
-VALIDATORS.mismatched_ref = (tags) => {
+VALIDATORS.mismatched_ref = (tags: any) => {
 
     let ref = tags.ref;
     if (!ref) return;
@@ -377,7 +387,7 @@ VALIDATORS.mismatched_ref = (tags) => {
 
 
 
-VALIDATORS.weird_height = (tags) => {
+VALIDATORS.weird_height = (tags: any) => {
 
     for (const category of CATEGORIES) {
         const key = `railway:signal:${category}:height`;
@@ -420,11 +430,11 @@ const ALLOWED_STATES = {
 }
 
 
-VALIDATORS.weird_states = (tags) => {
+VALIDATORS.weird_states = (tags: any) => {
 
     for (let [ category, allowedSet ] of Object.entries(ALLOWED_STATES)) {
         const key = `railway:signal:${category}:states`;
-        const val = tags[key];
+        const val = tags[key] as string | undefined;
         if (!val) continue;
 
         const vals = val.split(";") ?? [];
@@ -437,12 +447,12 @@ VALIDATORS.weird_states = (tags) => {
 }
 
 
-function validate(tags) {
-    const errors = [];
+function validate(tags: any) {
+    const errors: any[] = [];
     if (!tags) return errors;
 
     for (let [key, validator] of Object.entries(VALIDATORS))
-        if (validator(tags))
+        if ((validator as any)(tags))
             errors.push(key);
 
     return errors;
@@ -454,7 +464,7 @@ function validate(tags) {
  * --------------------------------------------------------------------------
  */
 
-function render(data) {
+function render(data: any) {
     if (layer) map.removeLayer(layer);
     if (!data) return;
 
@@ -462,14 +472,14 @@ function render(data) {
 
     const activeFilters = new Set(
         Array.from(document.querySelectorAll('.filter-check:checked'))
-            .map(cb => cb.value)
+            .map(cb => (cb as any).value)
     );
 
     const zoom = map.getZoom();
     const useBounds = zoom >= 12;
 
     // 🔥 Filter BEFORE creating GeoJSON
-    const visibleFeatures = data.filter(item => {
+    const visibleFeatures = data.filter((item: any) => {
         const latlng = L.latLng(item.pos.lat, item.pos.lon);
 
         // Only keep points inside current map view
@@ -479,12 +489,12 @@ function render(data) {
         if (item.errors.length === 0)
             return activeFilters.has("valid");
 
-        return item.errors.some(err => activeFilters.has(err));
+        return item.errors.some((err: any) => activeFilters.has(err));
     });
 
     const geoData = {
         type: "FeatureCollection",
-        features: visibleFeatures.map(item => ({
+        features: visibleFeatures.map((item: any) => ({
             type: "Feature",
             geometry: {
                 type: "Point",
@@ -494,8 +504,10 @@ function render(data) {
         }))
     };
 
-    layer = L.geoJSON(geoData, {
-        pointToLayer: (f, latlng) => {
+    layer = L.geoJSON(geoData as any, {
+        pointToLayer: (f2, latlng) => {
+            const f = f2 as any;
+
             const hasErrors = f.errors.length > 0;
 
             // LOW ZOOM → simple dots
@@ -532,7 +544,7 @@ function render(data) {
                  * SVG Path Breakdown (viewBox 24x24):
                  * Center point is (12, 12).
                  * 1. Move to (2, 12) - Left side of the flat edge.
-                 * 2. Arc to (22, 12) - The semi-circle (Radius 10).
+                 * 2. Arc to (22, 12) - The semicircle (Radius 10).
                  * 3. Line to (22, 17) - Down to form one side of the rectangle (r/2 = 5 units).
                  * 4. Line to (2, 17)  - The bottom flat edge of the rectangle.
                  * 5. Close path back to (2, 12).
@@ -574,14 +586,15 @@ function render(data) {
             return L.layerGroup([marker]);
         },
 
-        onEachFeature: (f, l) => {
+        onEachFeature: (f2, l) => {
+            const f = f2 as any;
 
             const popupHtml = `
                     <b>ID:</b> ${f.osm.id} 
                     <a href="https://osm.org/node/${f.osm.id}" target="_blank">View</a> 
                     <a href="https://osm.org/edit?node=${f.osm.id}" target="_blank">Edit</a>
                 <br>
-                    <b>Errors:</b> ${f.errors.length ? f.errors.map(e => ERRORS[e] ?? e).join(", ") : "none"}
+                    <b>Errors:</b> ${f.errors.length ? f.errors.map((e: any) => (ERRORS as any)[e] ?? e).join(", ") : "none"}
                 <br>
                     <b>Asimuth:</b> ${f.pos.azm}
                 <hr>
@@ -613,10 +626,10 @@ function render(data) {
  * --------------------------------------------------------------------------
  */
 
-function formatTags(tags) {
+function formatTags(tags: any) {
     const prefix = "railway:signal:";
-    const grouped = {};
-    const ungrouped = [];
+    const grouped: any = {};
+    const ungrouped: any[] = [];
 
     // --- 1. Group tags ---
     for (const [key, value] of Object.entries(tags)) {
@@ -648,7 +661,7 @@ function formatTags(tags) {
 
     // --- 3. Render ---
     const lines = [];
-    const formatValue = (v) => String(v).replace(/CZ-D1:/g, `<span class="prefix">CZ-D1:</span>`);
+    const formatValue = (v: any) => String(v).replace(/CZ-D1:/g, `<span class="prefix">CZ-D1:</span>`);
 
     // Render non-signal tags first
     for (const { key, value } of ungrouped) {
@@ -661,8 +674,8 @@ function formatTags(tags) {
         lines.push(`<b>${cat}${group.__main ? `: ${formatValue(group.__main)}` : ""}</b>`);
 
         group.sub
-        .sort((a, b) => a.key.localeCompare(b.key))
-        .forEach(({ key, value }) => {
+        .sort((a: any, b: any) => a.key.localeCompare(b.key))
+        .forEach(({ key, value }: { key: any, value: any }) => {
             lines.push(`&nbsp;&nbsp;<b>${key}</b>: ${formatValue(value)}`);
         });
     }
@@ -675,7 +688,7 @@ function initRendering() {
 
     let lastZoom = map.getZoom();
 
-    function shouldRerenderOnZoomChange(oldZoom, newZoom) {
+    function shouldRerenderOnZoomChange(oldZoom: any, newZoom: any) {
         return oldZoom >= ZOOM_THRESHOLD || newZoom >= ZOOM_THRESHOLD;
     }
 
@@ -709,10 +722,9 @@ function initRendering() {
 
 async function loadData() {
     try {
-        const res = await fetch('api/data');
-        const raw = await res.json();
+        const raw = await api.load();
 
-        currentData = raw.data.map(item => ({
+        currentData = raw.data.map((item: any) => ({
             ...item,
             errors: validate(item.tags)
         }));
