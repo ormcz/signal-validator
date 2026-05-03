@@ -1,8 +1,6 @@
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
-
 import "./style.css";
 import {Api} from "./api.ts";
+import {Map} from "./map.ts";
 
 // export default {};
 
@@ -15,38 +13,40 @@ import {Api} from "./api.ts";
 
 const api = new Api();
 
-const map = L.map('map', {
-    zoomControl: false
-}).setView([49.8, 15.5], 7);
+const map = new Map("map");
 
-const layers = {} as any;
+// const map = L.map('map', {
+//     zoomControl: false
+// }).setView([49.8, 15.5], 7);
+//
+// const layers = {} as any;
+//
+// layers["OSM"] = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+//     maxZoom: 21,        // allow user to zoom further
+//     maxNativeZoom: 19,  // OSM only provides tiles up to 19
+//     attribution: '© OpenStreetMap'
+// })
+//
+//
+// const customLayer = L.TileLayer.extend({
+//     getTileUrl: function(coords: any) {
+//         const tileSize = this.getTileSize();
+//         const nwPoint = coords.scaleBy(tileSize);
+//         const sePoint = nwPoint.add(tileSize);
+//
+//         const nw = map.options.crs!.project(map.unproject(nwPoint, coords.z));
+//         const se = map.options.crs!.project(map.unproject(sePoint, coords.z));
+//
+//         const bbox = [nw.x, se.y, se.x, nw.y].join(',');
+//
+//         return `http://127.0.0.1:8082/EPSG:3857/256/256/${bbox}`;
+//     }
+// });
+// layers["ORTOFOTO"] = new (customLayer as any)(null, { maxZoom: 21 });
+// let currentLayer: any = null;
 
-layers["OSM"] = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 21,        // allow user to zoom further
-    maxNativeZoom: 19,  // OSM only provides tiles up to 19
-    attribution: '© OpenStreetMap'
-})
 
 
-const customLayer = L.TileLayer.extend({
-    getTileUrl: function(coords: any) {
-        const tileSize = this.getTileSize();
-        const nwPoint = coords.scaleBy(tileSize);
-        const sePoint = nwPoint.add(tileSize);
-
-        const nw = map.options.crs!.project(map.unproject(nwPoint, coords.z));
-        const se = map.options.crs!.project(map.unproject(sePoint, coords.z));
-
-        const bbox = [nw.x, se.y, se.x, nw.y].join(',');
-
-        return `http://127.0.0.1:8082/EPSG:3857/256/256/${bbox}`;
-    }
-});
-layers["ORTOFOTO"] = new (customLayer as any)(null, { maxZoom: 21 });
-let currentLayer: any = null;
-
-
-let layer: any;
 let currentData: any = null;
 
 const CATEGORIES = [
@@ -83,59 +83,59 @@ const ERRORS = {
  * --------------------------------------------------------------------------
  */
 
-function initButtons() {
-    const downloadBtn = document.getElementById("btn");
-    downloadBtn!.onclick = async () => {
-        setUIEnabled(false);
-        showLoading(true);
-        try {
-            await api.refresh()
-            await loadData();
-        } catch (e) {
-            console.error("Download failed:", e);
-        } finally {
-            showLoading(false);
-            setUIEnabled(true);
-        }
-    };
+// function initButtons() {
+//     const downloadBtn = document.getElementById("btn");
+//     downloadBtn!.onclick = async () => {
+//         setUIEnabled(false);
+//         showLoading(true);
+//         try {
+//             await api.refresh()
+//             await loadData();
+//         } catch (e) {
+//             console.error("Download failed:", e);
+//         } finally {
+//             showLoading(false);
+//             setUIEnabled(true);
+//         }
+//     };
+//
+//     document.getElementById('zoom-in')!.onclick = () => map.zoomIn();
+//     document.getElementById('zoom-out')!.onclick = () => map.zoomOut();
+// }
 
-    document.getElementById('zoom-in')!.onclick = () => map.zoomIn();
-    document.getElementById('zoom-out')!.onclick = () => map.zoomOut();
-}
-
-function initToggle() {
-    const container = document.getElementById('layer-switch')!;
-
-    Object.entries(layers).forEach(([name, layer]: [string, any], index) => {
-        const btn = document.createElement('div');
-        btn.className = 'segment';
-        btn.textContent = name;
-
-        // First one = default active
-        if (index === 0) {
-            btn.classList.add('active');
-            currentLayer = layer;
-            layer.addTo(map);
-        }
-
-        btn.addEventListener('click', () => {
-            if (layer === currentLayer) return;
-
-            // Switch layer
-            map.removeLayer(currentLayer);
-            currentLayer = layer;
-            map.addLayer(currentLayer);
-
-            // Update UI
-            document.querySelectorAll('.segment').forEach(el => {
-                el.classList.remove('active');
-            });
-            btn.classList.add('active');
-        });
-
-        container.appendChild(btn);
-    });
-}
+// function initToggle() {
+//     const container = document.getElementById('layer-switch')!;
+//
+//     Object.entries(layers).forEach(([name, layer]: [string, any], index) => {
+//         const btn = document.createElement('div');
+//         btn.className = 'segment';
+//         btn.textContent = name;
+//
+//         // First one = default active
+//         if (index === 0) {
+//             btn.classList.add('active');
+//             currentLayer = layer;
+//             layer.addTo(map);
+//         }
+//
+//         btn.addEventListener('click', () => {
+//             if (layer === currentLayer) return;
+//
+//             // Switch layer
+//             map.removeLayer(currentLayer);
+//             currentLayer = layer;
+//             map.addLayer(currentLayer);
+//
+//             // Update UI
+//             document.querySelectorAll('.segment').forEach(el => {
+//                 el.classList.remove('active');
+//             });
+//             btn.classList.add('active');
+//         });
+//
+//         container.appendChild(btn);
+//     });
+// }
 
 function initCategories() {
     const container = document.getElementById("error-list")!;
@@ -162,19 +162,19 @@ function initCategories() {
         );
     }
 
-    document.getElementById('sel-all')!.onclick = () => {
-        document.querySelectorAll('.filter-check').forEach(cb => (cb as any).checked = true);
-        render(currentData);
-    };
+    // document.getElementById('sel-all')!.onclick = () => {
+    //     document.querySelectorAll('.filter-check').forEach(cb => (cb as any).checked = true);
+    //     render(currentData);
+    // };
+    //
+    // document.getElementById('sel-none')!.onclick = () => {
+    //     document.querySelectorAll('.filter-check').forEach(cb => (cb as any).checked = false);
+    //     render(currentData);
+    // };
 
-    document.getElementById('sel-none')!.onclick = () => {
-        document.querySelectorAll('.filter-check').forEach(cb => (cb as any).checked = false);
-        render(currentData);
-    };
-
-    document.querySelectorAll('.filter-check').forEach(el => {
-        (el as any).onchange = () => render(currentData);
-    });
+    // document.querySelectorAll('.filter-check').forEach(el => {
+    //     (el as any).onchange = () => render(currentData);
+    // });
 }
 
 /**
@@ -183,18 +183,18 @@ function initCategories() {
  * --------------------------------------------------------------------------
  */
 
-function setUIEnabled(enabled: boolean) {
-    const controls = document.querySelectorAll('#btn, .zoom-btn, .filter-check, .action-btn');
-    controls.forEach(el => {
-        if (enabled) {
-            el.classList.remove('disabled');
-            (el as any).style.pointerEvents = 'auto';
-        } else {
-            el.classList.add('disabled');
-            (el as any).style.pointerEvents = 'none';
-        }
-    });
-}
+// function setUIEnabled(enabled: boolean) {
+//     const controls = document.querySelectorAll('#btn, .zoom-btn, .filter-check, .action-btn');
+//     controls.forEach(el => {
+//         if (enabled) {
+//             el.classList.remove('disabled');
+//             (el as any).style.pointerEvents = 'auto';
+//         } else {
+//             el.classList.add('disabled');
+//             (el as any).style.pointerEvents = 'none';
+//         }
+//     });
+// }
 
 function showLoading(on: boolean) {
     document.getElementById("overlay")!.classList.toggle("active", on);
@@ -464,161 +464,161 @@ function validate(tags: any) {
  * --------------------------------------------------------------------------
  */
 
-function render(data: any) {
-    if (layer) map.removeLayer(layer);
-    if (!data) return;
-
-    const bounds = map.getBounds();
-
-    const activeFilters = new Set(
-        Array.from(document.querySelectorAll('.filter-check:checked'))
-            .map(cb => (cb as any).value)
-    );
-
-    const zoom = map.getZoom();
-    const useBounds = zoom >= 12;
-
-    // 🔥 Filter BEFORE creating GeoJSON
-    const visibleFeatures = data.filter((item: any) => {
-        const latlng = L.latLng(item.pos.lat, item.pos.lon);
-
-        // Only keep points inside current map view
-        if (useBounds && !bounds.contains(latlng)) return false;
-
-        // Apply error filters
-        if (item.errors.length === 0)
-            return activeFilters.has("valid");
-
-        return item.errors.some((err: any) => activeFilters.has(err));
-    });
-
-    const geoData = {
-        type: "FeatureCollection",
-        features: visibleFeatures.map((item: any) => ({
-            type: "Feature",
-            geometry: {
-                type: "Point",
-                coordinates: [item.pos.lon, item.pos.lat]
-            },
-            ...item
-        }))
-    };
-
-    layer = L.geoJSON(geoData as any, {
-        pointToLayer: (f2, latlng) => {
-            const f = f2 as any;
-
-            const hasErrors = f.errors.length > 0;
-
-            // LOW ZOOM → simple dots
-            if (zoom < 16) {
-                return L.circleMarker(latlng, {
-                    radius: hasErrors ? 7 : 4,
-                    fillColor: hasErrors ? "#ff4d4d" : "#2ecc71",
-                    color: "#000",
-                    weight: 1,
-                    fillOpacity: 0.9
-                });
-            }
-
-
-            const r = hasErrors ? 5 : 4;
-            const size = r * 4; // Increased container size to ensure the "tail" doesn't clip
-            const fillColor = hasErrors ? "#ff4d4d" : "#2ecc71";
-
-            let finalAzimuth = f.pos.azm;
-            let isDirectional = false;
-
-            if (finalAzimuth !== null && ["forward", "backward"].includes(f.tags["railway:signal:direction"])) {
-                isDirectional = true;
-                if (f.tags["railway:signal:direction"] === "backward") {
-                    finalAzimuth += 180;
-                }
-            }
-
-            let svgContent;
-
-            if (isDirectional) {
-
-                /**
-                 * SVG Path Breakdown (viewBox 24x24):
-                 * Center point is (12, 12).
-                 * 1. Move to (2, 12) - Left side of the flat edge.
-                 * 2. Arc to (22, 12) - The semicircle (Radius 10).
-                 * 3. Line to (22, 17) - Down to form one side of the rectangle (r/2 = 5 units).
-                 * 4. Line to (2, 17)  - The bottom flat edge of the rectangle.
-                 * 5. Close path back to (2, 12).
-                 */
-                svgContent = `
-                    <svg width="${size}" height="${size}" viewBox="0 0 24 24" style="transform: rotate(${finalAzimuth}deg); transform-origin: center; display: block;">
-                        <path 
-                            d="M 2 12 
-                               A 10 10 0 0 1 22 12 
-                               L 22 17 
-                               L 2 17 
-                               Z" 
-                            fill="${fillColor}" 
-                            fill-opacity="0.9" 
-                            stroke="#000" 
-                            stroke-width="2" 
-                            stroke-linejoin="round"
-                        />
-                    </svg>
-                `;
-            } else {
-                // Standard full circle
-                svgContent = `
-                    <svg width="${size}" height="${size}" viewBox="0 0 24 24" style="display: block;">
-                        <circle cx="12" cy="12" r="10" fill="${fillColor}" fill-opacity="0.9" stroke="#000" stroke-width="2" />
-                    </svg>
-                `;
-            }
-
-            const marker = L.marker(latlng, {
-                icon: L.divIcon({
-                    html: svgContent,
-                    className: '',
-                    iconSize: [size, size],
-                    iconAnchor: [size / 2, size / 2]
-                })
-            });
-
-            return L.layerGroup([marker]);
-        },
-
-        onEachFeature: (f2, l) => {
-            const f = f2 as any;
-
-            const popupHtml = `
-                    <b>ID:</b> ${f.osm.id} 
-                    <a href="https://osm.org/node/${f.osm.id}" target="_blank">View</a> 
-                    <a href="https://osm.org/edit?node=${f.osm.id}" target="_blank">Edit</a>
-                <br>
-                    <b>Errors:</b> ${f.errors.length ? f.errors.map((e: any) => (ERRORS as any)[e] ?? e).join(", ") : "none"}
-                <br>
-                    <b>Asimuth:</b> ${f.pos.azm}
-                <hr>
-                    <div class="popup-tags">${formatTags(f.tags)}</div>
-            `;
-
-            // Case 1: single layer (CircleMarker etc.)
-            if (l instanceof L.Layer && !(l instanceof L.LayerGroup)) {
-                l.bindPopup(popupHtml);
-                return;
-            }
-
-            // Case 2: group (your azimuth + marker combo)
-            if (l instanceof L.LayerGroup) {
-                l.eachLayer(subLayer => {
-                    if (subLayer instanceof L.CircleMarker || subLayer instanceof L.Marker) {
-                        subLayer.bindPopup(popupHtml);
-                    }
-                });
-            }
-
-        }
-    }).addTo(map);
-}
+// function render(data: any) {
+//     if (layer) map.removeLayer(layer);
+//     if (!data) return;
+//
+//     const bounds = map.getBounds();
+//
+//     const activeFilters = new Set(
+//         Array.from(document.querySelectorAll('.filter-check:checked'))
+//             .map(cb => (cb as any).value)
+//     );
+//
+//     const zoom = map.getZoom();
+//     const useBounds = zoom >= 12;
+//
+//     // 🔥 Filter BEFORE creating GeoJSON
+//     const visibleFeatures = data.filter((item: any) => {
+//         const latlng = L.latLng(item.pos.lat, item.pos.lon);
+//
+//         // Only keep points inside current map view
+//         if (useBounds && !bounds.contains(latlng)) return false;
+//
+//         // Apply error filters
+//         if (item.errors.length === 0)
+//             return activeFilters.has("valid");
+//
+//         return item.errors.some((err: any) => activeFilters.has(err));
+//     });
+//
+//     const geoData = {
+//         type: "FeatureCollection",
+//         features: visibleFeatures.map((item: any) => ({
+//             type: "Feature",
+//             geometry: {
+//                 type: "Point",
+//                 coordinates: [item.pos.lon, item.pos.lat]
+//             },
+//             ...item
+//         }))
+//     };
+//
+//     layer = L.geoJSON(geoData as any, {
+//         pointToLayer: (f2, latlng) => {
+//             const f = f2 as any;
+//
+//             const hasErrors = f.errors.length > 0;
+//
+//             // LOW ZOOM → simple dots
+//             if (zoom < 16) {
+//                 return L.circleMarker(latlng, {
+//                     radius: hasErrors ? 7 : 4,
+//                     fillColor: hasErrors ? "#ff4d4d" : "#2ecc71",
+//                     color: "#000",
+//                     weight: 1,
+//                     fillOpacity: 0.9
+//                 });
+//             }
+//
+//
+//             const r = hasErrors ? 5 : 4;
+//             const size = r * 4; // Increased container size to ensure the "tail" doesn't clip
+//             const fillColor = hasErrors ? "#ff4d4d" : "#2ecc71";
+//
+//             let finalAzimuth = f.pos.azm;
+//             let isDirectional = false;
+//
+//             if (finalAzimuth !== null && ["forward", "backward"].includes(f.tags["railway:signal:direction"])) {
+//                 isDirectional = true;
+//                 if (f.tags["railway:signal:direction"] === "backward") {
+//                     finalAzimuth += 180;
+//                 }
+//             }
+//
+//             let svgContent;
+//
+//             if (isDirectional) {
+//
+//                 /**
+//                  * SVG Path Breakdown (viewBox 24x24):
+//                  * Center point is (12, 12).
+//                  * 1. Move to (2, 12) - Left side of the flat edge.
+//                  * 2. Arc to (22, 12) - The semicircle (Radius 10).
+//                  * 3. Line to (22, 17) - Down to form one side of the rectangle (r/2 = 5 units).
+//                  * 4. Line to (2, 17)  - The bottom flat edge of the rectangle.
+//                  * 5. Close path back to (2, 12).
+//                  */
+//                 svgContent = `
+//                     <svg width="${size}" height="${size}" viewBox="0 0 24 24" style="transform: rotate(${finalAzimuth}deg); transform-origin: center; display: block;">
+//                         <path
+//                             d="M 2 12
+//                                A 10 10 0 0 1 22 12
+//                                L 22 17
+//                                L 2 17
+//                                Z"
+//                             fill="${fillColor}"
+//                             fill-opacity="0.9"
+//                             stroke="#000"
+//                             stroke-width="2"
+//                             stroke-linejoin="round"
+//                         />
+//                     </svg>
+//                 `;
+//             } else {
+//                 // Standard full circle
+//                 svgContent = `
+//                     <svg width="${size}" height="${size}" viewBox="0 0 24 24" style="display: block;">
+//                         <circle cx="12" cy="12" r="10" fill="${fillColor}" fill-opacity="0.9" stroke="#000" stroke-width="2" />
+//                     </svg>
+//                 `;
+//             }
+//
+//             const marker = L.marker(latlng, {
+//                 icon: L.divIcon({
+//                     html: svgContent,
+//                     className: '',
+//                     iconSize: [size, size],
+//                     iconAnchor: [size / 2, size / 2]
+//                 })
+//             });
+//
+//             return L.layerGroup([marker]);
+//         },
+//
+//         onEachFeature: (f2, l) => {
+//             const f = f2 as any;
+//
+//             const popupHtml = `
+//                     <b>ID:</b> ${f.osm.id}
+//                     <a href="https://osm.org/node/${f.osm.id}" target="_blank">View</a>
+//                     <a href="https://osm.org/edit?node=${f.osm.id}" target="_blank">Edit</a>
+//                 <br>
+//                     <b>Errors:</b> ${f.errors.length ? f.errors.map((e: any) => (ERRORS as any)[e] ?? e).join(", ") : "none"}
+//                 <br>
+//                     <b>Asimuth:</b> ${f.pos.azm}
+//                 <hr>
+//                     <div class="popup-tags">${formatTags(f.tags)}</div>
+//             `;
+//
+//             // Case 1: single layer (CircleMarker etc.)
+//             if (l instanceof L.Layer && !(l instanceof L.LayerGroup)) {
+//                 l.bindPopup(popupHtml);
+//                 return;
+//             }
+//
+//             // Case 2: group (your azimuth + marker combo)
+//             if (l instanceof L.LayerGroup) {
+//                 l.eachLayer(subLayer => {
+//                     if (subLayer instanceof L.CircleMarker || subLayer instanceof L.Marker) {
+//                         subLayer.bindPopup(popupHtml);
+//                     }
+//                 });
+//             }
+//
+//         }
+//     }).addTo(map);
+// }
 
 /**
  * --------------------------------------------------------------------------
@@ -626,92 +626,92 @@ function render(data: any) {
  * --------------------------------------------------------------------------
  */
 
-function formatTags(tags: any) {
-    const prefix = "railway:signal:";
-    const grouped: any = {};
-    const ungrouped: any[] = [];
+// function formatTags(tags: any) {
+//     const prefix = "railway:signal:";
+//     const grouped: any = {};
+//     const ungrouped: any[] = [];
+//
+//     // --- 1. Group tags ---
+//     for (const [key, value] of Object.entries(tags)) {
+//         if (key.startsWith(prefix)) {
+//             const rest = key.slice(prefix.length);
+//             const parts = rest.split(":");
+//             // Check if the base part is one of our categories
+//             const maybeCategory = parts[0];
+//
+//             if (CATEGORIES.includes(maybeCategory)) {
+//                 grouped[maybeCategory] ??= { __main: null, sub: [] };
+//                 if (parts.length === 1) {
+//                     grouped[maybeCategory].__main = value;
+//                 } else {
+//                     grouped[maybeCategory].sub.push({
+//                         key: ":" + parts.slice(1).join(":"),
+//                                                     value: value
+//                     });
+//                 }
+//                 continue;
+//             }
+//         }
+//         ungrouped.push({ key, value });
+//     }
+//
+//     // --- 2. Sort ---
+//     const sortedCategories = Object.keys(grouped).sort();
+//     ungrouped.sort((a, b) => a.key.localeCompare(b.key));
+//
+//     // --- 3. Render ---
+//     const lines = [];
+//     const formatValue = (v: any) => String(v).replace(/CZ-D1:/g, `<span class="prefix">CZ-D1:</span>`);
+//
+//     // Render non-signal tags first
+//     for (const { key, value } of ungrouped) {
+//         lines.push(`<b>${key}</b>: ${value}`);
+//     }
+//
+//     // Render grouped signal tags
+//     for (const cat of sortedCategories) {
+//         const group = grouped[cat];
+//         lines.push(`<b>${cat}${group.__main ? `: ${formatValue(group.__main)}` : ""}</b>`);
+//
+//         group.sub
+//         .sort((a: any, b: any) => a.key.localeCompare(b.key))
+//         .forEach(({ key, value }: { key: any, value: any }) => {
+//             lines.push(`&nbsp;&nbsp;<b>${key}</b>: ${formatValue(value)}`);
+//         });
+//     }
+//
+//     return lines.join("<br>");
+// }
 
-    // --- 1. Group tags ---
-    for (const [key, value] of Object.entries(tags)) {
-        if (key.startsWith(prefix)) {
-            const rest = key.slice(prefix.length);
-            const parts = rest.split(":");
-            // Check if the base part is one of our categories
-            const maybeCategory = parts[0];
-
-            if (CATEGORIES.includes(maybeCategory)) {
-                grouped[maybeCategory] ??= { __main: null, sub: [] };
-                if (parts.length === 1) {
-                    grouped[maybeCategory].__main = value;
-                } else {
-                    grouped[maybeCategory].sub.push({
-                        key: ":" + parts.slice(1).join(":"),
-                                                    value: value
-                    });
-                }
-                continue;
-            }
-        }
-        ungrouped.push({ key, value });
-    }
-
-    // --- 2. Sort ---
-    const sortedCategories = Object.keys(grouped).sort();
-    ungrouped.sort((a, b) => a.key.localeCompare(b.key));
-
-    // --- 3. Render ---
-    const lines = [];
-    const formatValue = (v: any) => String(v).replace(/CZ-D1:/g, `<span class="prefix">CZ-D1:</span>`);
-
-    // Render non-signal tags first
-    for (const { key, value } of ungrouped) {
-        lines.push(`<b>${key}</b>: ${value}`);
-    }
-
-    // Render grouped signal tags
-    for (const cat of sortedCategories) {
-        const group = grouped[cat];
-        lines.push(`<b>${cat}${group.__main ? `: ${formatValue(group.__main)}` : ""}</b>`);
-
-        group.sub
-        .sort((a: any, b: any) => a.key.localeCompare(b.key))
-        .forEach(({ key, value }: { key: any, value: any }) => {
-            lines.push(`&nbsp;&nbsp;<b>${key}</b>: ${formatValue(value)}`);
-        });
-    }
-
-    return lines.join("<br>");
-}
-
-function initRendering() {
-    const ZOOM_THRESHOLD = 12;
-
-    let lastZoom = map.getZoom();
-
-    function shouldRerenderOnZoomChange(oldZoom: any, newZoom: any) {
-        return oldZoom >= ZOOM_THRESHOLD || newZoom >= ZOOM_THRESHOLD;
-    }
-
-    function shouldRenderOnMove() {
-        return map.getZoom() >= ZOOM_THRESHOLD;
-    }
-
-    map.on('zoomend', () => {
-        const newZoom = map.getZoom();
-
-        if (shouldRerenderOnZoomChange(lastZoom, newZoom)) {
-            render(currentData);
-        }
-
-        lastZoom = newZoom;
-    });
-
-    map.on('moveend', () => {
-        if (shouldRenderOnMove()) {
-            render(currentData);
-        }
-    });
-}
+// function initRendering() {
+//     const ZOOM_THRESHOLD = 12;
+//
+//     let lastZoom = map.getZoom();
+//
+//     function shouldRerenderOnZoomChange(oldZoom: any, newZoom: any) {
+//         return oldZoom >= ZOOM_THRESHOLD || newZoom >= ZOOM_THRESHOLD;
+//     }
+//
+//     function shouldRenderOnMove() {
+//         return map.getZoom() >= ZOOM_THRESHOLD;
+//     }
+//
+//     map.on('zoomend', () => {
+//         const newZoom = map.getZoom();
+//
+//         if (shouldRerenderOnZoomChange(lastZoom, newZoom)) {
+//             render(currentData);
+//         }
+//
+//         lastZoom = newZoom;
+//     });
+//
+//     map.on('moveend', () => {
+//         if (shouldRenderOnMove()) {
+//             render(currentData);
+//         }
+//     });
+// }
 
 
 /**
@@ -729,7 +729,43 @@ async function loadData() {
             errors: validate(item.tags)
         }));
 
-        render(currentData);
+
+        const geoData = {
+            type: "FeatureCollection",
+            features: currentData.map((item: any) => {
+
+                let azm: number | null = null;
+                const direction = item.tags["railway:signal:direction"];
+
+                if (!direction) {
+                    azm = null;
+                } else if (direction == "forward") {
+                    if (item.pos.azm) azm = item.pos.azm;
+                } else if (direction == "backward") {
+                    if (item.pos.azm) azm = (item.pos.azm + 180) % 360;
+                } else if (/([0-2]?[0-9]{1,2}|3[0-5][0-9]|360)/.test(direction)) {
+                    azm = parseInt(direction, 10);
+                }
+
+                return {
+                    type: "Feature",
+                    geometry: {
+                        type: "Point",
+                        coordinates: [item.pos.lon, item.pos.lat]
+                    },
+                    properties: {
+                        id: item.osm.id,
+                        col: item.errors.length > 0 ? "#ff4d4d" : "#2ecc71",
+                        azm: azm,
+                    }
+                };
+
+            })
+        } as const;
+
+        console.log(geoData);
+
+        map.update(geoData);
     } catch (e) {
         console.error("Data load failed:", e);
     }
@@ -741,10 +777,10 @@ async function loadData() {
  * --------------------------------------------------------------------------
  */
 ;(async () => {
-    initButtons();
-    initToggle();
-    initCategories();
-    initRendering();
+    // initButtons();
+    // initToggle();
+    // initCategories();
+    // initRendering();
 
     showLoading(true);
     await loadData();
