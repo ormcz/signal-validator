@@ -21,7 +21,7 @@ export type ApiResponse = {
 }
 
 export class Api {
-    private baseUrl = "http://localhost:8090/api/";
+    private baseUrl = "/api/";
 
     async load(): Promise<ApiResponse> {
         try {
