@@ -66,15 +66,23 @@ const CATEGORIES = [
  * --------------------------------------------------------------------------
  */
 const ERRORS = {
-    unknown_signal_type: "Unknown signal type",
+    unknown_signal_type: "Unknown signal prefix+type",
 
-    weird_ref: "Weird signal ref given the category",
-    weird_function: "Weird signal function",
-    mismatched_function: "Mismatched signal function",
+    weird_ref: "Weird signal ref for this category",
+    weird_function: "Unknown main signal function",
+    mismatched_function: "Mismatched ain signal function",
     mismatched_ref: "Ref and Cs-D1:ref mismatched",
 
     weird_height: "Weird height value",
     weird_states: "Weird signal states",
+
+    no_shape: "Speed limit with no shape",
+    weird_shape: "Speed limit with weird shape",
+
+    minor_as_a_signal: "Minor is likely used as main signal",
+    weird_minor: "Weird minor function",
+    unofficial_minor: "Minor function not described on wiki",
+    // to_replace_minor: "Minor easily replaceable",
 };
 
 /**
@@ -404,28 +412,28 @@ VALIDATORS.weird_height = (tags: any) => {
 
 const ALLOWED_STATES = {
     "main": new Set([
-        "CZ-D1:stuj", "CZ-D1:volno", "CZ-D1:jizda_vlaku_dovolena", "CZ-D1:posun_dovolen", "stop", "approach", "clear", "shunting_enabled", "call_signal", "speed_limit", "..."
+        "CZ-D1:stuj", "CZ-D1:volno", "CZ-D1:jizda_vlaku_dovolena", "CZ-D1:posun_dovolen", "stop", "approach", "clear", "driving_permited", "shunting_enabled", "call_signal", "speed_limit", "speed_limit_distant", "approach_speed_distant", "clear_speed_distant", "..."
     ]),
     "main_repeated": new Set([
-        "stop", "approach", "clear", "shunting_enabled", "call_signal", "speed_limit", "..."
+        "stop", "approach", "clear", "driving_permited", "shunting_enabled", "call_signal", "speed_limit", "speed_limit_distant", "approach_speed_distant", "clear_speed_distant", "..."
     ]),
     "combined": new Set([
-        "CZ-D1:stuj", "CZ-D1:vystraha", "CZ-D1:opakovani_vystraha", "CZ-D1:volno", "CZ-D1:posun_dovolen", "stop", "approach", "clear", "shunting_enabled", "call_signal", "speed_limit", "..."
+        "CZ-D1:stuj", "CZ-D1:vystraha", "CZ-D1:opakovani_vystraha", "CZ-D1:volno", "CZ-D1:posun_dovolen", "stop", "approach", "clear", "driving_permited", "shunting_enabled", "call_signal", "speed_limit", "speed_limit_distant", "approach_speed_distant", "clear_speed_distant", "..."
     ]),
     "combined_repeated": new Set([
-        "stop", "approach", "clear", "shunting_enabled", "call_signal", "speed_limit", "..."
+        "stop", "approach", "clear", "driving_permited", "shunting_enabled", "call_signal", "speed_limit", "speed_limit_distant", "approach_speed_distant", "clear_speed_distant", "..."
     ]),
     "shunting": new Set([
-        "off", "CZ-D1:posun_dovolen", "CZ-D1:posun_zakazan", "shunting_enabled", "shunting_disabled", "..."
+        "off", "CZ-D1:posun_dovolen", "CZ-D1:posun_zakazan", "shunting_enabled", "shunting_disabled", "wait_and_see", "..."
     ]),
     "shunting_repeated": new Set([
         "off", "shunting_enabled", "shunting_disabled", "..."
     ]),
     "distant": new Set([
-        "CZ-D1:vystraha", "CZ-D1:opakovani_vystraha", "CZ-D1:volno", "CZ-D1:opakovani_volno", "approach", "clear", "..."
+        "CZ-D1:vystraha", "CZ-D1:opakovani_vystraha", "CZ-D1:volno", "CZ-D1:opakovani_volno", "approach", "clear", "speed_limit_distant", "approach_speed_distant", "clear_speed_distant", "..."
     ]),
     "distant_repeated": new Set([
-        "approach", "clear", "..."
+        "approach", "clear", "speed_limit_distant", "approach_speed_distant", "clear_speed_distant", "..."
     ]),
 }
 
@@ -445,6 +453,128 @@ VALIDATORS.weird_states = (tags: any) => {
 
     return false;
 }
+
+VALIDATORS.no_shape = (tags: any) => {
+
+    if (tags["railway:signal:speed_limit"] == "Cs-D1") {
+        if (!tags["railway:signal:speed_limit:shape"])
+            return true;
+    }
+
+    if (tags["railway:signal:speed_limit_distant"] == "Cs-D1") {
+        if (!tags["railway:signal:speed_limit_distant:shape"])
+            return true;
+    }
+
+}
+
+VALIDATORS.weird_shape = (tags: any) => {
+
+    if (tags["railway:signal:speed_limit"] == "Cs-D1") {
+
+        const shapes = (tags["railway:signal:speed_limit:shape"] as string ?? "").split(";").map(a => a.trim()).filter(a => !!a);
+        const ALLOWED = [ "Tsquare", "|square|", "square", "NSsquare", "NSsquareX" ]
+
+        if (shapes.some(s => !ALLOWED.includes(s)))
+            return true;
+    }
+
+    if (tags["railway:signal:speed_limit_distant"] == "Cs-D1") {
+
+        const shapes = (tags["railway:signal:speed_limit_distant:shape"] as string ?? "").split(";").map(a => a.trim()).filter(a => !!a);
+        const ALLOWED = [ "triangle", "NSsquare", "NSsquareX" ]
+
+        if (shapes.some(s => !ALLOWED.includes(s)))
+            return true;
+    }
+
+}
+
+VALIDATORS.weird_minor = (tags: any) => {
+
+    const ALLOWED = [
+        "group_signal", // Skupinové návěstidlo
+        "speed_limit_30", "speed_sign_30", "speed_limit_50", "speed_sign_50", // Tabulka 30/50
+        "speed_limit_id_30", "speed_id_30", "speed_limit_id_50", "speed_id_50", // Světlo 3/5
+        "speed_line_60", "speed_limit_60", "speed_line_80", "speed_line_100", // Světelné pruhy
+        "speed_limit_line", // Nebo tohle?
+        "speed_limit", // -> Nutné vydedukovat z :type
+        "speed_limit_matrix", "speed_matrix", // Rychlostní indikátor
+        "matrix_speed", // -> Nutno vydedukovat
+        "speed_limit_distant_matrix", // Předvěstní indikátor
+        "first_distant_block", "last_distant_block",
+        "shortened_braking",
+        "arrow_track", "arrow_track_left", "arrow_track_right",
+        "arrow",
+        "open_crossing",
+        "track_indicator", "direction_indicator",
+        "distant_block", "distant_entry"
+    ];
+
+
+    // if (tags["railway:signal:minor"] !== "Cs-D1")
+    //     return false;
+
+    const functions = (tags["railway:signal:minor:function"] as string ?? "").split(";").map(a => a.trim()).filter(a => !!a);
+
+    return functions.some(s => !ALLOWED.includes(s))
+
+}
+
+VALIDATORS.unofficial_minor = (tags: any) => {
+
+    const ALLOWED = [
+        "group_signal", // Skupinové návěstidlo
+        "speed_limit_30", "speed_limit_50", // Tabulka 30/50
+        "speed_limit_id_30", "speed_limit_id_50", // Světlo 3/5
+        "speed_line_60", "speed_line_80", "speed_line_100", // Světelné pruhy
+        "speed_limit_line", // Nebo tohle?
+        "speed_limit_matrix", // Rychlostní indikátor
+        "speed_limit_distant_matrix", // Předvěstní indikátor
+        "first_distant_block", "last_distant_block",
+        "shortened_breaking",
+        "arrow_track",
+        "arrow",
+        "open_crossing",
+        "track_indicator", "direction_indicator",
+        "distant_block", "distant_entry"
+    ];
+
+
+    // if (tags["railway:signal:minor"] !== "Cs-D1")
+    //     return false;
+
+    const functions = (tags["railway:signal:minor:function"] as string ?? "").split(";").map(a => a.trim()).filter(a => !!a);
+
+    return functions.some(s => !ALLOWED.includes(s))
+
+}
+
+VALIDATORS.minor_as_a_signal = (tags: any) => {
+
+    if (tags["railway:signal:minor"] && tags["railway:signal:minor"] !== "Cs-D1")
+        return true;
+
+    return false;
+}
+
+// VALIDATORS.to_replace_minor = (tags: any) => {
+//
+//     const ALLOWED = [
+//         "matrix_speed",
+//         "speed_limit_id_50",
+//
+//     ];
+//
+//
+//     // if (tags["railway:signal:minor"] !== "Cs-D1")
+//     //     return false;
+//
+//     const functions = (tags["railway:signal:minor:function"] as string ?? "").split(";").map(a => a.trim()).filter(a => !!a);
+//
+//     return functions.some(s => ALLOWED.includes(s))
+//
+// }
 
 
 function validate(tags: any) {
