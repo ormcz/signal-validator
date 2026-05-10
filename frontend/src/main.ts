@@ -246,7 +246,7 @@ function render(data: any) {
     const visibleFeatures = data.map((item: any) => {
         // Apply error filters
         if (item.errors.length === 0) {
-            if (Object.keys(item.tags).every(tag => !tag.includes("railway") || ["railway", "railway:signal:position", "railway:signal:direction"].includes(tag)))
+            if (Object.keys(item.tags).every(tag => !tag.includes("railway") || ["railway", "railway:signal:position", "railway:signal:direction", "railway:position", "railway:position:exact"].includes(tag)))
                 return { ...item, cat: "basic"};
             else
                 return { ...item, cat: "valid"};
