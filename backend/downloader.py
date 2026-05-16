@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import requests
+import ijson
 import json
 import os
 import math
@@ -75,44 +76,27 @@ def average_azimuth(angles: list[float], *, angle_tolerance: float) -> float | N
 
 # --- Data Processing Pipeline ---
 
-def parse_osm_elements(elements):
-    """Sorts raw OSM elements into lookup dictionaries and way lists."""
-    node_positions = {}
-    signal_nodes = {}
-    railway_ways = []
-
-    for el in elements:
-        if el["type"] == "node":
-            node_positions[el["id"]] = (el["lat"], el["lon"])
-            if el.get("tags", {}).get("railway") == "signal":
-                signal_nodes[el["id"]] = el
-        elif el["type"] == "way":
-            railway_ways.append(el)
-
-    return node_positions, signal_nodes, railway_ways
-
-
-def gather_signal_azimuths(node_positions, signal_nodes, railway_ways):
-    """Traverses ways to calculate tangent azimuths for watched nodes."""
-    azimuths = defaultdict(list)
-
-    for way in railway_ways:
-        way_nodes = way.get("nodes", [])
+def process_element(el, node_positions, signal_nodes, azimuths):
+    """Processes a single OSM element and updates state dictionaries."""
+    if el["type"] == "node":
+        node_positions[el["id"]] = (el["lat"], el["lon"])
+        if el.get("tags", {}).get("railway") == "signal":
+            signal_nodes[el["id"]] = el
+    elif el["type"] == "way":
+        way_nodes = el.get("nodes", [])
         for i, node_id in enumerate(way_nodes):
             if node_id in signal_nodes:
-                node_position = node_positions[node_id]
-
                 # Vector from previous node to signal
                 if i > 0:
-                    prev_position = node_positions[way_nodes[i - 1]]
-                    azimuths[node_id].append(calculate_bearing(prev_position, node_position))
+                    prev_id = way_nodes[i - 1]
+                    if prev_id in node_positions:
+                        azimuths[node_id].append(calculate_bearing(node_positions[prev_id], node_positions[node_id]))
 
                 # Vector from signal to next node
                 if i < len(way_nodes) - 1:
-                    next_position = node_positions[way_nodes[i + 1]]
-                    azimuths[node_id].append(calculate_bearing(node_position, next_position))
-
-    return azimuths
+                    next_id = way_nodes[i + 1]
+                    if next_id in node_positions:
+                        azimuths[node_id].append(calculate_bearing(node_positions[node_id], node_positions[next_id]))
 
 
 def format_signal_output(signal_nodes, azimuths, *, angle_tolerance):
@@ -139,53 +123,61 @@ def format_signal_output(signal_nodes, azimuths, *, angle_tolerance):
     return processed_signals
 
 
-def process_data(raw_data, fetch_time, *, angle_tolerance):
-    """Orchestrates the transformation from raw OSM JSON to the final schema."""
-    elements = raw_data.get("elements", [])
-    node_positions, signal_nodes, railway_ways = parse_osm_elements(elements)
-    azimuths = gather_signal_azimuths(node_positions, signal_nodes, railway_ways)
+# --- IO and Orchestration ---
+
+def download_and_process(overpass_url, query, angle_tolerance):
+    """Downloads OSM data and processes it in a memory-efficient way using streaming."""
+    fetch_time = datetime.now(timezone.utc).isoformat()
+
+    r = requests.post(
+        overpass_url,
+        data={"data": query},
+        headers={"User-Agent": "railway-signal-validator/1.0"},
+        stream=True
+    )
+    r.raise_for_status()
+    r.raw.decode_content = True
+
+    node_positions = {}
+    signal_nodes = {}
+    azimuths = defaultdict(list)
+    osm_timestamp = None
+
+    parser = ijson.parse(r.raw, use_float=True)
+    for prefix, event, value in parser:
+        if prefix == 'osm3s.timestamp_osm_base':
+            osm_timestamp = value
+        elif prefix == 'elements' and event == 'start_array':
+            # Use ijson.items to yield individual elements from the elements array
+            for element in ijson.items(parser, 'elements.item'):
+                process_element(element, node_positions, signal_nodes, azimuths)
+
     processed_signals = format_signal_output(signal_nodes, azimuths, angle_tolerance=angle_tolerance)
 
     return {
         "meta": {
             "fetch_time": fetch_time,
-            "data_time": raw_data.get("osm3s", {}).get("timestamp_osm_base"),
+            "data_time": osm_timestamp,
         },
         "data": processed_signals
     }
 
 
-# --- IO and Orchestration ---
-
-def download_data(*, overpass_url, query):
-    r = requests.post(
-        overpass_url,
-        data={"data": query},
-        headers={"User-Agent": "railway-signal-validator/1.0"}
-    )
-    r.raise_for_status()
-    return r.json()
-
-
-def save_data(data, *, data_path):
+def save_data(data, data_path):
     os.makedirs(os.path.dirname(data_path), exist_ok=True)
     with open(data_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-
-
 def run(*, overpass_url=OVERPASS_URL, query=QUERY, angle_tolerance=ANGLE_TOLERANCE, data_path=DATA_PATH):
-    fetch_time = datetime.now(timezone.utc).isoformat()
-    raw_data = download_data(overpass_url=overpass_url, query=query)
-    final_data = process_data(raw_data, fetch_time, angle_tolerance=angle_tolerance)
-    save_data(final_data, data_path=data_path)
+    final_data = download_and_process(overpass_url, query, angle_tolerance)
+    save_data(final_data, data_path)
     return len(final_data['data'])
 
 
 def main():
     try:
-        print("Downloading data...")
+        print("Downloading and processing data (streaming)...")
         signal_count = run()
         print(f"Success! Saved {signal_count} signals to {DATA_PATH}")
     except Exception as e:
