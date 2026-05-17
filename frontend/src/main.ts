@@ -149,35 +149,34 @@ function initCategories() {
     `;
     container.appendChild(helperRow);
 
-    // valid state
     container.appendChild(
-        createFilterItem("valid", "Valid signals", true, false)
+        createFilterItem("valid", "Valid signals", true, false, true)
     );
     container.appendChild(
-        createFilterItem("basic", "Undetailed signals", false, false)
+        createFilterItem("basic", "Undetailed signals", false, false, true)
     );
 
     container.appendChild(document.createElement("hr"));
 
     container.appendChild(
-        createFilterItem("warning", "Show otherwise valid signals", true, true)
+        createFilterItem("warning", "Show otherwise valid signals", true, true, true)
     );
 
 
 
     validator.getNames().forEach((name, idx) => {
         container.appendChild(
-            createFilterItem(idx, name, false, true)
+            createFilterItem(idx, name, false, true, true)
         );
     })
 
     document.getElementById('sel-all')!.onclick = () => {
-        document.querySelectorAll('.filter-check').forEach(cb => (cb as any).checked = true);
+        document.querySelectorAll('.filter-check.auto-selectable').forEach(cb => (cb as any).checked = true);
         render(currentData);
     };
 
     document.getElementById('sel-none')!.onclick = () => {
-        document.querySelectorAll('.filter-check').forEach(cb => (cb as any).checked = false);
+        document.querySelectorAll('.filter-check.auto-selectable').forEach(cb => (cb as any).checked = false);
         render(currentData);
     };
 
@@ -210,13 +209,13 @@ function showLoading(on: boolean) {
     document.body.classList.toggle("disabled", on);
 }
 
-function createFilterItem(value: any, label: any, isBold: any, checked: any) {
+function createFilterItem(value: any, label: any, isBold: any, checked: any, autoSelectable: boolean) {
     const item = document.createElement("label");
     item.className = "filter-item";
     if (isBold) item.style.fontWeight = "bold";
 
     item.innerHTML = `
-    <input type="checkbox" class="filter-check" value="${value}" ${checked ? 'checked' : ''}>
+    <input type="checkbox" class="filter-check ${autoSelectable ? "auto-selectable" : ""}" value="${value}" ${checked ? 'checked' : ''}>
     <span style="margin-left: 8px;">${label}</span>
     `;
     return item;
@@ -263,11 +262,10 @@ function render(data: any) {
 
         switch (item.cat) {
             case "basic":
-                return activeFilters.has("basic");
             case "valid":
-                return activeFilters.has("valid");
             case "warning":
-                return activeFilters.has("warning");
+                return activeFilters.has(item.cat);
+
             default:
                 return true;
         }

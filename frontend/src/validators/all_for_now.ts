@@ -2,6 +2,45 @@ import type {ValidationManager} from "../validation.ts";
 
 export function register_all(validator: ValidationManager) {
 
+    validator.add("Incompatible categories", tags => {
+
+        const categories = new Set(
+            Object.keys(tags)
+                .map(k => {
+                    if (!k.startsWith("railway:signal:"))
+                        return null;
+                    return k.split(":")[2];
+                })
+                .filter(k => !!k) as string[]
+        );
+
+        const has = categories.has.bind(categories);
+
+
+        for (let cat of [ ...categories ])
+            categories.add("X" + cat.replace("_repeated", ""))
+        if (["main", "main_repeated", "combined", "combined_repeated"].some(has))
+            categories.add("Xhlavni");
+
+
+        const any = (...x: string[]) => () => x.some(has);
+        const all = (...x: string[])=> () => x.every(has);
+        const exclusive = (...x: string[]) => ()=> x.filter(has).length > 1;
+
+
+        const problems: (() => boolean)[] = [
+            exclusive("main", "main_repeated", "combined", "combined_repeated"),
+            exclusive("distant", "distant_repeated"),
+            exclusive("shunting", "shunting_repeated"),
+            exclusive("humping", "humping_repeated"),
+
+            exclusive("Xshunting", "Xhlavni", "Xdistant"),
+        ]
+
+        return problems.some(fn => fn())
+
+    });
+
     validator.add("Unknown signal prefix+type" ,tags => {
 
         const CATEGORIES = [
@@ -69,13 +108,38 @@ export function register_all(validator: ValidationManager) {
         return false;
     });
 
+    validator.add("Signal type is 'yes'" ,tags => {
+
+        const CATEGORIES = [
+            "main", "main_repeated", "distant", "distant_repeated", "minor", "minor_repeated", "minor_distant", "combined", "combined_repeated",
+            "shunting", "shunting_repeated", "crossing", "crossing_repeated", "crossing_distant", "crossing_info", "crossing_hint",
+            "electricity", "humping", "humping_repeated", "speed_limit", "speed_limit_distant", "whistle",
+            "ring", "route", "route_distant", "wrong_road", "stop", "stop_demand",
+            "station_distant", "radio", "departure", "resetting_switch",
+            "resetting_switch_distant", "snowplow", "short_route", "brake_test",
+            "fouling_point", "helper_engine", "train_protection", "steam_locomotive",
+            "station", "rack", "wheel_cleaning"
+        ];
+
+        for (const category of CATEGORIES) {
+            const key = `railway:signal:${category}`;
+            const val = tags[key];
+            if (!val) continue;
+
+            if (val == "yes")
+                return true;
+        }
+
+        return false;
+    });
+
     validator.add("Weird signal ref for this category", tags => {
 
         const ref = tags.ref;
         if (!ref) return false;
 
         if (tags["railway:signal:main"] || tags["railway:signal:main_repeated"] || tags["railway:signal:combined"] || tags["railway:signal:combined_repeated"])
-            return !/^(_|[0-9]+)?\s*([ABD-ZČĎŇŘŠŤŽ]|CH?)?\s*[LS]|((_|[0-9]+)?\s*([ABD-ZČĎŇŘŠŤŽ]|CH?)?\s*[LS]c?\s*(_|[0-9]+)?(z?[a-z]|_)?(-[0-9]+(z?[a-z]|_)?)?|[LS][ok]\s*(_|[0-9]+)?|([0-9]+-)?(_|[0-9]+)?)$/.test(ref);
+            return !/^(_|[0-9]+)?\s*([ABD-ZČĎŇŘŠŤŽ]|CH?)?\s*[LS]|((_|[0-9]+)?\s*([ABD-ZČĎŇŘŠŤŽ]|CH?)?\s*[LS]c?\s*(_|[0-9]+)?(z?[a-z]|_)?(-[0-9]+(z?[a-z]|_)?)?|[LS]o\s*(_|[0-9]+)?|([0-9]+-)?(_|[0-9]+)?)|[LS]k\s*(_|[0-9]+)?(-[0-9]+(z?[a-z]|_)?)?$/.test(ref);
 
         if (tags["railway:signal:shunting_repeated"] || (tags["railway:signal:shunting"] && tags["railway:signal:shunting:repeated"] == "yes"))
             return !/^(I?X|VI{0,3}|I?V|I{0,3})?\s*([ABD-ZČĎŇŘŠŤŽ]|CH?)?\s*O\s*Se\s*([ABD-ZČĎŇŘŠŤŽ]|CH?)?\s*(_|[1-9][0-9]*)?$/.test(ref);
@@ -130,7 +194,7 @@ export function register_all(validator: ValidationManager) {
             exit: /^(_|[0-9]+)?\s*([ABD-ZČĎŇŘŠŤŽ]|CH?)?\s*[LS]\s*(_|[0-9]+)?(z?[a-z]|_)?(-[0-9]+(z?[a-z]|_)?)?$/,
             intermediate: /^(_|[0-9]+)?\s*([ABD-ZČĎŇŘŠŤŽ]|CH?)?\s*[LS]c\s*(_|[0-9]+)?(z?[a-z]|_)?(-[0-9]+(z?[a-z]|_)?)?$/,
             block: /^[LS]o\s*(_|[0-9]+)?|([0-9]+-)?(_|[0-9]+)?$/,
-            protection: /^[LS]k\s*(_|[0-9]+)?$/,
+            protection: /^[LS]k\s*(_|[0-9]+)?(-[0-9]+(z?[a-z]|_)?)?$/,
         };
 
         if (fun.includes("entry"))
@@ -242,6 +306,68 @@ export function register_all(validator: ValidationManager) {
         return false;
     });
 
+    validator.add("States/shape mismatch", (tags) => {
+
+        const hasSpeed = !!tags["railway:signal:minor:function"]?.includes("speed");
+
+        for (const category of ["main", "main_repeated", "combined", "combined_repeated"]) {
+            const state = tags[`railway:signal:${category}:states`];
+            const lamp = tags[`railway:signal:${category}:type`];
+
+            if (!lamp || !state)
+                continue;
+
+            let mustBeSecondYellow = false;
+            const lamps = lamp
+                .split(";")
+                .map(s => s.trim())
+                .filter(s => !!s)
+                .map(s => {
+                    if (s == "|") {
+                        mustBeSecondYellow = false;
+                        return s;
+                    }
+                    if (["R", "G", "W"].includes(s)) {
+                        mustBeSecondYellow = true;
+                        return s;
+                    }
+                    if (s != "Y") {
+                        return s;
+                    }
+
+                    if (mustBeSecondYellow)
+                        return "YY";
+
+                    mustBeSecondYellow = true;
+                    return "Y"
+                });
+            const states = state.split(";") ?? [];
+
+            if (states.includes("approach") != lamps.includes("Y"))
+                return true;
+            if (states.includes("clear") != lamps.includes("G"))
+                return true;
+            if (states.includes("stop") != lamps.includes("R"))
+                return true;
+
+            const mustHaveWhite= states.includes("call_signal")
+                || states.includes("shunting_enabled")
+                || category.includes("repeated");
+            if (mustHaveWhite != lamps.includes("W"))
+                return true;
+
+            if (states.includes("speed_limit") != lamps.includes("YY"))
+                return true;
+
+            if (hasSpeed && !states.includes("speed_limit"))
+                return true;
+        }
+
+        return false;
+
+    });
+
+
     validator.add("Speed limit with no shape", tags => {
         if (tags["railway:signal:speed_limit"] == "Cs-D1") {
             if (!tags["railway:signal:speed_limit:shape"])
@@ -260,7 +386,7 @@ export function register_all(validator: ValidationManager) {
         if (tags["railway:signal:speed_limit"] == "Cs-D1") {
 
             const shapes = (tags["railway:signal:speed_limit:shape"] as string ?? "").split(";").map(a => a.trim()).filter(a => !!a);
-            const ALLOWED = ["Tsquare", "|square|", "square", "NSsquare", "NSsquareX"]
+            const ALLOWED = ["Tsquare", "T|square|", "|square|", "square", "round", "NSsquare", "NSsquareX"]
 
             if (shapes.some(s => !ALLOWED.includes(s)))
                 return true;
@@ -272,6 +398,25 @@ export function register_all(validator: ValidationManager) {
             const ALLOWED = ["triangle", "NSsquare", "NSsquareX"]
 
             if (shapes.some(s => !ALLOWED.includes(s)))
+                return true;
+        }
+
+        return false;
+    });
+
+    validator.add("Likely older speed_limit tagging", tags => {
+
+        for (let category of ["main", "main_repeated", "combined", "combined_repeated", "distant", "distant_repeated"]) {
+            const val: string | undefined = tags[`railway:signal:${category}`];
+            if (!val) continue;
+
+            if (!val.startsWith("Cs-D1") && !val.startsWith("yes"))
+                continue;
+
+            if (Object.keys(tags).some(k => k.includes("speed_limit")))
+                return true;
+
+            if (Object.keys(tags).some(k => k.includes("speed_limit_distant")))
                 return true;
         }
 
