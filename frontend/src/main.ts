@@ -427,8 +427,8 @@ function formatTags(tags: any) {
                     grouped[maybeCategory].__main = value;
                 } else {
                     grouped[maybeCategory].sub.push({
-                        key: ":" + parts.slice(1).join(":"),
-                                                    value: value
+                        key: parts.slice(1).join(":"),
+                        value: value
                     });
                 }
                 continue;
@@ -463,17 +463,19 @@ function formatTags(tags: any) {
                 && key.match(/lights|type/)
 
             if (!isLightsTag) {
-                lines.push(`&nbsp;&nbsp;<b>${key}</b>: ${formatValue(value)}`);
+                lines.push(`&nbsp;&nbsp;:<b>${key}</b>: ${formatValue(value)}`);
                 return;
             }
 
-
             // Add link to visualizer
             const isDwarf = group.sub
-                .some(({ key, value }: { key: string, value: string}) => key === "height" && value === "dwarf");
+                .some(({ key, value }: any) => key === "height" && value === "dwarf");
+
+            debugger;
+
             const link = `https://navestidlo.detectivefiasco.cz/${isDwarf ? "dwarf" : "normal"}#${value}`;
 
-            lines.push(`&nbsp;&nbsp;<b>${key}</b>: <a target="_blank" href="${link}">${value}</a>`);
+            lines.push(`&nbsp;&nbsp;:<b>${key}</b>: <a style="text-decoration: none" target="_blank" href="${link}">${value}</a>`);
 
         });
     }
