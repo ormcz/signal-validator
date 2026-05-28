@@ -458,7 +458,23 @@ function formatTags(tags: any) {
         group.sub
         .sort((a: any, b: any) => a.key.localeCompare(b.key))
         .forEach(({ key, value }: { key: any, value: any }) => {
-            lines.push(`&nbsp;&nbsp;<b>${key}</b>: ${formatValue(value)}`);
+
+            const isLightsTag = cat.match(/combined|main|distant|shunting|humping/)
+                && key.match(/lights|type/)
+
+            if (!isLightsTag) {
+                lines.push(`&nbsp;&nbsp;<b>${key}</b>: ${formatValue(value)}`);
+                return;
+            }
+
+
+            // Add link to visualizer
+            const isDwarf = group.sub
+                .some(({ key, value }: { key: string, value: string}) => key === "height" && value === "dwarf");
+            const link = `https://navestidlo.detectivefiasco.cz/${isDwarf ? "dwarf" : "normal"}#${value}`;
+
+            lines.push(`&nbsp;&nbsp;<b>${key}</b>: <a target="_blank" href="${link}">${value}</a>`);
+
         });
     }
 
