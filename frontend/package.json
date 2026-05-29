@@ -1,5 +1,5 @@
 {
-  "name": "railway-signal-validator-frontend",
+  "name": "@ormcz/signal-validator-frontend",
   "private": true,
   "version": "0.0.0",
   "type": "module",

@@ -21,7 +21,9 @@ export type ApiResponse = {
 }
 
 export class Api {
-    private baseUrl = "/api/";
+    // private baseUrl = "/api/";
+    // private baseUrl = "http://localhost:8090/api/";
+    private baseUrl = "https://validator.detectivefiasco.cz/api/";
 
     async load(): Promise<ApiResponse> {
         try {
